@@ -1,0 +1,59 @@
+Setting up a Jupyter Notebook on a remote server is challenging but doable once the process is understood. There are three main steps:
+
+1) Run Jupyter on a free port on the remote machine.
+2) Connect the remote machine port to a free local port
+3) Open a new browser from the local port
+
+For simplicity, I made the local and remote ports the same. I chose 8888, but really any port is fine. My Linux script to free a port works like this:
+
+#!/bin/bash
+
+#Free port 8888
+
+if lsof -i :8888 &>/dev/null; then
+    echo "Port 8888 is in use:"
+    lsof -i :8888
+    read -p "Kill the process using port 8888? [y/N] " answer
+    if [[ "$answer" == "y" || "$answer" == "Y" ]]; then
+        kill -9 $(lsof -ti :8888)
+        echo "Killed the process using port 8888."
+    else
+        echo "Aborted."
+        exit 1
+    fi
+else
+    echo "Port 8888 is free."
+fi
+
+We check if any processes are active on port 8888, print them, and prompt the user if they want them killed. Once they are killed, the port will be free to use for our notebook. Note that 8888 must
+be freed on both the local and remote machines, but the process is very similar. On the remote machine, just make sure to free first, then launch your preferred container. Processes may be running 
+in the background that are visible from the main server but are invisible in the container.
+
+Next, we set up the Jupyter notebook remotely like this:
+
+#!/bin/bash
+
+#Set path to Jupyter
+export PATH="$HOME/.local/bin:$PATH"
+
+#Launch the notebook
+echo "Launching Jupyter Notebook..."
+jupyter notebook --no-browser --port=8888 --ip=127.0.0.1
+
+We set the path to .local/bin because that's where Jupyter is installed remotely. We then launch a notebook on the remote machine without a browser (that will come later).
+
+Finally, we connect the local port 8888 to the remote port 8888 and open a browser on our machine:
+
+#!/bin/bash
+
+echo "Starting SSH tunnel to remote Jupyter..."
+ssh -N -L 8888:localhost:8888 schester@dunegpvm06.FNAL.GOV &  # start in background
+
+# Optional delay to ensure tunnel is ready
+sleep 2
+
+echo "Opening browser..."
+explorer.exe "http://localhost:8888"
+
+We connect local port 8888 to remote port 8888, wait a couple seconds for the connection to establish, then open a new browser for our notebook. Explorer works best for Windows systems, but 
+any native browser will likely work. Now you can run Jupyter locally while accessing remote files! 
